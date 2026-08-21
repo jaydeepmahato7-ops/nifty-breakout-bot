@@ -2,7 +2,6 @@ name: run-indian-market
 
 on:
   schedule:
-    # आप अपने हिसाब से यहाँ टाइम सेट कर सकते हैं (जैसे सोमवार से शुक्रवार बाजार खुलने से पहले)
     - cron: '30 3 * * 1-5'
   workflow_dispatch:
 
@@ -24,19 +23,17 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      # (यहाँ से 'Run Stock Alerts' वाले स्टेप को पूरी तरह हटा दिया गया है)
-
       - name: Run Bot
-        run: python main.py  # (या आपकी मुख्य बोट फाइल का जो नाम हो)
+        run: python main.py
 
       - name: Run Supersonic Scanner
-        run: python supersonic_scanner.py  # (जो भी आपकी स्क्रिप्ट का नाम हो)
+        run: python supersonic_scanner.py
 
       - name: Run NSE Announcement Bot
         run: python nse_announcement_bot.py
 
       - name: Upload Scan Report (Artifact)
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: market-reports
           path: |
