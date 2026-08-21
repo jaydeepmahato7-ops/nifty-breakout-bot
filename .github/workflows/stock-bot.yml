@@ -24,10 +24,10 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Run Bot
-        run: python main.py
+        run: python bot.py
 
       - name: Run Supersonic Scanner
-        run: python supersonic_scanner.py
+        run: python "nse_Allrounder Supersonic Scanner_bot.py"
 
       - name: Run NSE Announcement Bot
         run: python nse_announcement_bot.py
@@ -39,3 +39,4 @@ jobs:
           path: |
             *.csv
             *.xlsx
+         
