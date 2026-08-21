@@ -1,45 +1,44 @@
-name: Indian Market Automation Bot
+name: run-indian-market
 
 on:
-  workflow_dispatch:
   schedule:
-    - cron: '*/3 * * * *' # हर 3 मिनट पर ऑटोमैटिक चलेगा
+    # आप अपने हिसाब से यहाँ टाइम सेट कर सकते हैं (जैसे सोमवार से शुक्रवार बाजार खुलने से पहले)
+    - cron: '30 3 * * 1-5'
+  workflow_dispatch:
 
 jobs:
-  run-indian-market:
+  build:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-          # यहाँ से भी cache: 'pip' हटा दिया गया है
 
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pandas requests yfinance openpyxl
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Run Stock Alerts
-        run: python Stock_Alerts.py
+      # (यहाँ से 'Run Stock Alerts' वाले स्टेप को पूरी तरह हटा दिया गया है)
 
       - name: Run Bot
-        run: python bot.py
+        run: python main.py  # (या आपकी मुख्य बोट फाइल का जो नाम हो)
 
       - name: Run Supersonic Scanner
-        run: python "nse_Allrounder Supersonic Scanner_bot.py"
+        run: python supersonic_scanner.py  # (जो भी आपकी स्क्रिप्ट का नाम हो)
 
       - name: Run NSE Announcement Bot
         run: python nse_announcement_bot.py
 
       - name: Upload Scan Report (Artifact)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
-          name: Chakravyuh-Result-Excel
-          path: Chakravyuh_Verified_Breakouts.xlsx
-          if-no-files-found: ignore
-         
+          name: market-reports
+          path: |
+            *.csv
+            *.xlsx
