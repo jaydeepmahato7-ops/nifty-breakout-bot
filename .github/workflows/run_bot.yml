@@ -32,12 +32,16 @@ jobs:
         run: |
           pip install pandas yfinance requests
 
-      - name: Run Stock Scanner Bot
+      - - name: Run All Trading Bots
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
         run: |
           python bot.py
+          python scanner.py
+          python "nse_Allrounder Supersonic Scanner_bot.py"
+          python nse_announcement_bot.py
+          python Stock_Alerts.py
 
       - name: Commit and Push trade_log.csv
         run: |
