@@ -1,11 +1,9 @@
-
 import datetime
 from datetime import datetime, timedelta, timezone
 import json
 import logging
 import os
 import sys
-import time
 import pandas as pd
 import requests
 import warnings
@@ -32,7 +30,6 @@ def send_telegram(msg):
     print(f"Telegram Error: {e}")
 
 
-# --- JSON डुप्लीकेट प्रिवेंशन फंक्शंस ---
 def load_sent_alerts():
   if os.path.exists(ALERT_RECORD_FILE):
     try:
@@ -60,7 +57,6 @@ def is_already_sent(alert_key, today_str):
   return False
 
 
-# IST टाइमज़ोन (+5:30)
 IST = timezone(timedelta(hours=5, minutes=30))
 
 coindcx_cryptos = [
@@ -144,7 +140,6 @@ def analyze_crypto_market(ticker_list, today_str):
       cmp = float(close.iloc[-1])
       coin_name = ticker.replace("-USD", "")
 
-      # --- अनिवार्य स्कोर और वोलैटिलिटी गणना (Score Filter > 1000) ---
       recent_high = float(high.tail(10).max())
       recent_low = float(low.tail(10).min())
       range_spread = (
@@ -157,12 +152,8 @@ def analyze_crypto_market(ticker_list, today_str):
           (1 / range_spread) * (cur_vol / avg_vol if avg_vol > 0 else 1), 2
       )
 
-      # यदि स्कोर 1000 से अधिक है तभी चारों रणनीतियों की जांच होगी
       if squeeze_score > 1000:
-
-        # ----------------------------------------------------
         # STRATEGY 1: Fast 5/13 EMA Scalping
-        # ----------------------------------------------------
         ema_5 = close.ewm(span=5, adjust=False).mean()
         ema_13 = close.ewm(span=13, adjust=False).mean()
         p5, c5 = float(ema_5.iloc[-2]), float(ema_5.iloc[-1])
@@ -185,9 +176,7 @@ def analyze_crypto_market(ticker_list, today_str):
             )
             save_sent_alert(alert_key, today_str)
 
-        # ----------------------------------------------------
         # STRATEGY 2: Research Paper EMA 12/21 Crossover
-        # ----------------------------------------------------
         ema_12 = close.ewm(span=12, adjust=False).mean()
         ema_21 = close.ewm(span=21, adjust=False).mean()
         p12, c12 = float(ema_12.iloc[-2]), float(ema_12.iloc[-1])
@@ -198,7 +187,7 @@ def analyze_crypto_market(ticker_list, today_str):
           if not is_already_sent(alert_key, today_str):
             signals_12_21.append(
                 f"🟢 `[12/21 BUY]` *{coin_name}* | Score: `{squeeze_score}` |"
-                f" CMP: `{cmp}` | EMA12: `{round(c12,2)}`"
+                f" CMP: `{cmp}`"
             )
             save_sent_alert(alert_key, today_str)
         elif p12 >= p21 and c12 < c21:
@@ -206,19 +195,17 @@ def analyze_crypto_market(ticker_list, today_str):
           if not is_already_sent(alert_key, today_str):
             signals_12_21.append(
                 f"🔴 `[12/21 SELL]` *{coin_name}* | Score: `{squeeze_score}` |"
-                f" CMP: `{cmp}` | EMA12: `{round(c12,2)}`"
+                f" CMP: `{cmp}`"
             )
             save_sent_alert(alert_key, today_str)
 
-        # ----------------------------------------------------
-        # STRATEGY 3: Probabilistic Extrema & Rolling
-        # ----------------------------------------------------
+        # STRATEGY 3: Probabilistic Extrema
         if cmp <= recent_low * 1.01:
           alert_key = f"{coin_name}_PROB_MIN_BUY"
           if not is_already_sent(alert_key, today_str):
             signals_probabilistic.append(
                 f"🟢 `[Prob. Minima BUY]` *{coin_name}* | Score:"
-                f" `{squeeze_score}` | Min: `{round(recent_low,4)}`"
+                f" `{squeeze_score}`"
             )
             save_sent_alert(alert_key, today_str)
         elif cmp >= recent_high * 0.99:
@@ -226,13 +213,11 @@ def analyze_crypto_market(ticker_list, today_str):
           if not is_already_sent(alert_key, today_str):
             signals_probabilistic.append(
                 f"🔴 `[Prob. Maxima SELL]` *{coin_name}* | Score:"
-                f" `{squeeze_score}` | Max: `{round(recent_high,4)}`"
+                f" `{squeeze_score}`"
             )
             save_sent_alert(alert_key, today_str)
 
-        # ----------------------------------------------------
-        # STRATEGY 4: Pre-Breakout Trend Strategy (Entry & Target Included)
-        # ----------------------------------------------------
+        # STRATEGY 4: Pre-Breakout
         ema_30 = close.ewm(span=30, adjust=False).mean()
         ema_50 = close.ewm(span=50, adjust=False).mean()
         ema_100 = close.ewm(span=100, adjust=False).mean()
@@ -260,16 +245,14 @@ def analyze_crypto_market(ticker_list, today_str):
           if not is_already_sent(alert_key, today_str):
             sl = round(c200, 4)
             if sl >= cmp:
-              sl = round(cmp * 0.985, 4)  # BUY के लिए SL हमेशा नीचे हो
+              sl = round(cmp * 0.985, 4)
             risk = cmp - sl
             target = round(cmp + (risk * 3), 4)
             signals_prebreakout.append(
                 f"🚀 `[Pre-Breakout BUY]` *{coin_name}* | Score:"
-                f" `{squeeze_score}` | RSI: `{round(curr_rsi,1)}` | Entry:"
-                f" `{cmp}` | Target: `{target}`"
+                f" `{squeeze_score}` | Target: `{target}`"
             )
             save_sent_alert(alert_key, today_str)
-
         elif (
             is_downtrend
             and (40 <= curr_rsi <= 52)
@@ -280,21 +263,17 @@ def analyze_crypto_market(ticker_list, today_str):
           if not is_already_sent(alert_key, today_str):
             sl = round(c200, 4)
             if sl <= cmp:
-              sl = round(cmp * 1.015, 4)  # SELL के लिए SL हमेशा ऊपर हो
+              sl = round(cmp * 1.015, 4)
             risk = sl - cmp
             target = round(cmp - (risk * 3), 4)
             signals_prebreakout.append(
                 f"🔻 `[Pre-Breakout SELL]` *{coin_name}* | Score:"
-                f" `{squeeze_score}` | RSI: `{round(curr_rsi,1)}` | Entry:"
-                f" `{cmp}` | Target: `{target}`"
+                f" `{squeeze_score}` | Target: `{target}`"
             )
             save_sent_alert(alert_key, today_str)
 
-    except Exception as e:
-      try:
-        sys.stderr = old_stderr
-      except:
-        pass
+    except Exception:
+      pass
 
   return (
       signals_5_13,
@@ -304,55 +283,39 @@ def analyze_crypto_market(ticker_list, today_str):
   )
 
 
-print("🚀 4-Strategy Mandatory Score Crypto Bot शुरू हो गया है...")
+print("🚀 4-Strategy Crypto Bot शुरू हो गया है...")
+t_obj = datetime.now(IST)
+t_str = t_obj.strftime("%d-%m-%Y | %H:%M:%S IST")
+today_date_str = t_obj.strftime("%Y-%m-%d")
 
-try:
-  while True:
-    t_obj = datetime.now(IST)
-    t_str = t_obj.strftime("%d-%m-%Y | %H:%M:%S IST")
-    today_date_str = t_obj.strftime("%Y-%m-%d")
-    print(f"[{t_str}] मार्केट स्कैन किया जा रहा है...")
+s5_13, s12_21, s_prob, s_pre = analyze_crypto_market(
+    coindcx_cryptos, today_date_str
+)
 
-    s5_13, s12_21, s_prob, s_pre = analyze_crypto_market(
-        coindcx_cryptos, today_date_str
-    )
-
-    if s5_13 or s12_21 or s_prob or s_pre:
-      msg_lines = [
-          (
-              "⚡ *4-STRATEGY HIGH-SCORE ALERTS (Score > 1000)*"
-              f" ⚡\n*Time:* `{t_str}`\n"
-          )
-      ]
-
-      if s5_13:
-        msg_lines.append("⚡ *--- 1. Fast 5/13 EMA Scalping ---*")
-        msg_lines.extend(s5_13[:3])
-        msg_lines.append("")
-
-      if s12_21:
-        msg_lines.append("📚 *--- 2. Research Paper 12/21 EMA ---*")
-        msg_lines.extend(s12_21[:3])
-        msg_lines.append("")
-
-      if s_prob:
-        msg_lines.append("📊 *--- 3. Probabilistic Extrema & Rolling ---*")
-        msg_lines.extend(s_prob[:3])
-        msg_lines.append("")
-
-      if s_pre:
-        msg_lines.append("📈 *--- 4. Pre-Breakout (30/50/100 EMA) ---*")
-        msg_lines.extend(s_pre[:3])
-
-      send_telegram("\n".join(msg_lines))
-      print("✅ सभी रणनीतियों के स्कोर सहित सिग्नल्स टेलीग्राम पर भेज दिए गए हैं!")
-    else:
-      print(
-          "⏳ नए सिग्नल्स नहीं मिले हैं (पुराने सिग्नल्स फ़िल्टर हो चुके हैं)।"
-          " स्कैन जारी है..."
+if s5_13 or s12_21 or s_prob or s_pre:
+  msg_lines = [
+      (
+          "⚡ *4-STRATEGY HIGH-SCORE ALERTS (Score > 1000)* ⚡\n*Time:*"
+          f" `{t_str}`\n"
       )
+  ]
+  if s5_13:
+    msg_lines.append("⚡ *--- 1. Fast 5/13 EMA Scalping ---*")
+    msg_lines.extend(s5_13[:3])
+    msg_lines.append("")
+  if s12_21:
+    msg_lines.append("📚 *--- 2. Research Paper 12/21 EMA ---*")
+    msg_lines.extend(s12_21[:3])
+    msg_lines.append("")
+  if s_prob:
+    msg_lines.append("📊 *--- 3. Probabilistic Extrema & Rolling ---*")
+    msg_lines.extend(s_prob[:3])
+    msg_lines.append("")
+  if s_pre:
+    msg_lines.append("📈 *--- 4. Pre-Breakout (30/50/100 EMA) ---*")
+    msg_lines.extend(s_pre[:3])
 
-    time.sleep(120)
-
-except KeyboardInterrupt:
-  print("\n🛑 Bot को उपयोगकर्ता द्वारा रोक दिया गया है।")
+  send_telegram("\n".join(msg_lines))
+  print("✅ सिग्नल्स टेलीग्राम पर भेज दिए गए हैं!")
+else:
+  print("⏳ नए सिग्नल्स नहीं मिले हैं।")
